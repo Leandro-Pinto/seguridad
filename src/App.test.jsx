@@ -42,7 +42,13 @@ describe('App Component', () => {
 
   it('renders help text', () => {
     render(<App />)
-    expect(screen.getByText(/Edit.*src\/App\.jsx.*and save to test HMR/i)).toBeInTheDocument()
+    // Text is split across elements, so we check for the paragraph containing the text
+    const paragraph = screen.getByText((content, element) => {
+      return element?.tagName.toLowerCase() === 'p' && content.includes('Edit') && content.includes('save to test HMR')
+    })
+    expect(paragraph).toBeInTheDocument()
+    // Verify the code element is inside
+    expect(screen.getByText('src/App.jsx')).toBeInTheDocument()
   })
 
   it('renders click instructions', () => {
