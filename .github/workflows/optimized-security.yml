@@ -35,7 +35,7 @@ jobs:
         key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
 
     - name: Instalar dependencias
-      run: npm ci
+      run: npm install
 
     - name: Linting y Formateo
       run: |
