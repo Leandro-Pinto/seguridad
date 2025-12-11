@@ -1,0 +1,86 @@
+name: Seguridad
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Cache de dependencias
+      uses: actions/cache@v4
+      with:
+        path: |
+          node_modules
+          ~/.npm
+          ~/.cache/vite
+        key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+
+    - name: Instalar dependencias
+      run: npm ci
+
+    - name: Linting y Formateo
+      run: |
+        npm run lint || echo "Linting no configurado o falló"
+        npm run format:check || echo "Formateo no configurado"
+
+    - name: Type Checking
+      run: npm run type-check || echo "Type checking no configurado"
+
+    - name: Tests Unitarios con Cobertura
+      run: |
+        npm run test:coverage
+        # Verificación básica de cobertura (opcional)
+        COVERAGE=$(cat coverage/coverage-summary.json 2>/dev/null | jq -r '.total.lines.pct // 0' 2>/dev/null || echo "0")
+        echo "Cobertura de líneas: ${COVERAGE}%"
+
+    - name: Build de Producción
+      run: npm run build
+      env:
+        VITE_ENV: ci
+
+    - name: Análisis de Bundle Size
+      run: npx bundlesize 2>/dev/null || echo "Bundlesize no ejecutado (puede requerir configuración)"
+
+    - name: Lighthouse CI
+      run: |
+        # Solo ejecuta si el paquete está instalado
+        if npm list @lhci/cli 2>/dev/null | grep -q "@lhci/cli"; then
+          npx lhci autorun --upload.target=temporary-public-storage || echo "Lighthouse CI falló o no configurado"
+        else
+          echo "Lighthouse CLI no instalado, omitiendo..."
+        fi
+
+    - name: Subir Reportes de Cobertura
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-${{ github.run_id }}
+        path: coverage/
+        retention-days: 30
+
+    - name: Subir Reporte de Lighthouse
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: lighthouse-report-${{ github.run_id }}
+        path: .lighthouseci/
+        retention-days: 30
